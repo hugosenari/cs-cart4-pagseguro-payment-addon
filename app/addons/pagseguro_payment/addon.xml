@@ -1,0 +1,72 @@
+<?xml version="1.0"?>
+ 
+<addon scheme='2.0'>
+    <id>pagseguro_payment</id>
+    <version>1.0</version> 
+    <name>PagSeguro Payment Add-on</name>
+    <description>PagSeguro Payment Add-on</description>
+    <priority>100510</priority>
+    <settings>
+        <sections>
+            <section id="general">
+                <name>General</name>
+                <items>
+                    <item id="account_id">
+                        <name>Account Id</name>
+                        <type>input</type>
+                        <default_value>pagseguro@pagseguro.pagseguro</default_value>
+                    </item>
+                    <item id="account_token">
+                        <name>Account Token</name>
+                        <type>input</type>
+                        <default_value>Eu devia ser um token</default_value>
+                    </item>
+                </items>
+            </section>
+        </sections>
+    </settings>
+    <queries>
+        <item for="install">
+            REPLACE INTO
+                cscart_payment_processors
+            (
+                processor_id,
+                processor,
+                processor_script,
+                processor_template,
+                admin_template,
+                callback,
+                type
+            )
+            values (
+                (
+                    select
+                        if( processor.total = 1,processor.id,
+                            if( processors.processor_id >= 1000,processors.processor_id + 1,1000 )
+                        )as id
+                    from
+                        cscart_payment_processors as processors,
+                        (
+                            select
+                                processor_id as id,
+                                count(processor_id) as total
+                            from
+                                cscart_payment_processors
+                            where
+                                processor = 'PagSeguro'
+                        ) as processor
+                    order by
+                        id desc
+                    limit 1
+                ),
+                'PagSeguro',
+                '../addons/pagseguro_payment/payments/script.php',
+                '',
+                '',
+                'N',
+                'P'
+            );
+        </item>
+        <item for="uninstall">DELETE from cscart_payment_processors where processor = 'PagSeguro';</item>
+    </queries>
+</addon>
