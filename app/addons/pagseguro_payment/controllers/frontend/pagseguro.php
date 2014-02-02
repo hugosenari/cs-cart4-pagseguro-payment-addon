@@ -10,7 +10,7 @@ if ($mode == 'complete')
     $order_short_info = fn_get_order_short_info($order_id);
     $cur_status = $order_short_info['status'];
     echo("asdkfhaljsdlhfalsdjf");
-    echo(print_r($order_short_info));
+    echo($order_short_info);
     if($cur_status == 'N')
     {
         $pp_response = array();
