@@ -41,3 +41,4 @@ else
     // create a redirect (form that posts) data to PagSeguro payment
     PSH\retirect_to_payment($submit_url);
 }
+exit;

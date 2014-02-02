@@ -42,10 +42,8 @@ function create_payment_request($order_info)
 function set_order_info($paymentRequest, $order_info)
 {
     $id = $order_info['order_id'];
-    $paymentRequest->addParameter('redirectURL', "http://php-barzilay.rhcloud.com/index.php?dispatch=checkout.complete&order_id=$id");
-    //$paymentRequest->addParameter('redirectURL', \fn_url("pagseguro.complete?order_id=$id"));
-    $paymentRequest->addParameter('notificationURL', "http://php-barzilay.rhcloud.com/index.php?dispatch=payment_notification.pagseguro&payment=pagseguro&order_id=$id");
-    //$paymentRequest->addParameter('notificationURL', \fn_url("payment_notification.foo?payment=pagseguro&order_id=$id"));
+    $paymentRequest->addParameter('redirectURL', \fn_url("pagseguro.complete?order_id=$id"));
+    $paymentRequest->addParameter('notificationURL', \fn_url("payment_notification.pagseguro?payment=pagseguro&order_id=$id"));
     $paymentRequest->setReference($id);
     $paymentRequest->setCurrency(\PagSeguroCurrencies::getIsoCodeByName('REAL'));
     return $paymentRequest;
