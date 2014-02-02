@@ -7,7 +7,8 @@ if (!defined('BOOTSTRAP')) { die('Access denied'); }
 if ($mode == 'complete')
 {
     $order_id = $_REQEST['order_id'];
-    $cur_status = fn_get_order_short_info($order_id)['status'];
+    $order_short_info = fn_get_order_short_info($order_id);
+    $cur_status = $order_short_info['status'];
     if($cur_status == 'N')
     {
         $pp_response = array();
