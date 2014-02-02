@@ -11,7 +11,7 @@ if ($mode == 'complete')
     echo('Request' . print_r($_REQEST));
     //echo('Get' . print_r($_GET));
     $order_id = $_REQEST["order_id"];
-    echo("$order_id: $order_id");
+    echo("order_id: $order_id");
     
     $order_short_info = fn_get_order_short_info($order_id);
     echo($order_short_info);
