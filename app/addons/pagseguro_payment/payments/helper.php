@@ -148,7 +148,8 @@ function translate_pagseguro_status($type, $order_id)
     // http://www.cs-cart.com/documentation/reference_guide/index.htmld?orders_order_statuses.htm
     // B: Backordered       C: Complete         D: Declined         F: Failed
     // I: Canceled          N: None             O: Open             P: Processed
-    $cur_status = fn_get_order_short_info($order_id)['status'];
+    $order_short_info = fn_get_order_short_info($order_id);
+    $cur_status = $order_short_info['status'];
     $result = $cur_status;
     switch($status_type)
     {
