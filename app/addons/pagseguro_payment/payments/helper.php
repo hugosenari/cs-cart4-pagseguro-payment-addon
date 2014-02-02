@@ -132,13 +132,20 @@ function payment_notification($code)
         $order_id = $transaction->getReference();
         $status = $transaction->getStatus();
         $status_type = $status->getTypeFromValue();
+        list($from, $to) = translate_pagseguro_status($status_type, $order_id);
         
         $pp_response = array();
         $pp_response['reason_text'] = __('order_id') . '-' . $status_type;
-        $pp_response['order_status'] = translate_pagseguro_status($status_type, $order_id);
+        $pp_response['order_status'] = $to;
 
-        fn_update_order_payment_info($order_id, $pp_response);
-        fn_change_order_status($order_id, $pp_response['order_status'], '', array());
+        if($from == 'N')
+        {
+           fn_finish_payment($order_id, $pp_response); 
+        } else
+        {
+           fn_update_order_payment_info($order_id, $pp_response);
+           fn_change_order_status($order_id, $pp_response['order_status'], $from, array());
+        }
     }
 }
 
@@ -176,5 +183,5 @@ function translate_pagseguro_status($type, $order_id)
             }
             break;
     }
-    return $result;
+    return array($cur_status, $result);
 }
