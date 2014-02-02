@@ -12,6 +12,7 @@ if ($mode == 'complete')
     $order_id = $_REQEST['order_id'];
     $order_short_info = fn_get_order_short_info($order_id);
     $cur_status = $order_short_info['status'];
+    echo("asdkfhaljsdlhfalsdjf");
     print_r($order_short_info);
     //PSH\logger( true), __FILE__, __LINE__);
     if($cur_status == 'N')
