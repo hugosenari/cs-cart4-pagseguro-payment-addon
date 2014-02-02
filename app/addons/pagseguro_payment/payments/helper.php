@@ -43,8 +43,8 @@ function set_order_info($paymentRequest, $order_info)
 {
     $id = $order_info['order_id'];
     $paymentRequest->addParameter('redirectURL', "http://php-barzilay.rhcloud.com/index.php?dispatch=checkout.complete&order_id=$id");
-    //$paymentRequest->addParameter('redirectURL', \fn_url("checkout.complete?order_id=$id"));
-    $paymentRequest->addParameter('notificationURL', "http://php-barzilay.rhcloud.com/index.php?dispatch=payment_notification.foo&order_id=$id");
+    //$paymentRequest->addParameter('redirectURL', \fn_url("pagseguro.complete?order_id=$id"));
+    $paymentRequest->addParameter('notificationURL', "http://php-barzilay.rhcloud.com/index.php?dispatch=payment_notification.pagseguro&payment=pagseguro&order_id=$id");
     //$paymentRequest->addParameter('notificationURL', \fn_url("payment_notification.foo?payment=pagseguro&order_id=$id"));
     $paymentRequest->setReference($id);
     $paymentRequest->setCurrency(\PagSeguroCurrencies::getIsoCodeByName('REAL'));
@@ -111,12 +111,6 @@ function get_payment_url($paymentRequest, $credentials)
 }
 
 
-function save_order($id)
-{
-    \fn_order_placement_routines('save', $id);
-}
-
-
 function retirect_to_payment($submit_url)
 {
     // aditional data for cs-cart
@@ -129,32 +123,59 @@ function retirect_to_payment($submit_url)
 }
 
 
-function payment_notification($mode)
+function payment_notification($code)
 {
-    //logger("Notificacao ($mode): " . print_r($_REQUEST, true), __FILE__, __LINE__);
     if ($_REQUEST['notificationType'] === 'transaction') {
         $transaction = \PagSeguroNotificationService::checkTransaction(  
             get_credentials(),
             $_REQUEST['notificationCode']
         );
+        
         $order_id = $transaction->getReference();
         $status = $transaction->getStatus();
-        switch($status->getTypeFromValue())
-        {
-            case 'WAITING_PAYMENT':
-                break;
-            case 'IN_ANALYSIS':
-                break;
-            case 'PAID':
-                break;
-            case 'AVAILABLE':
-                break;
-            case 'IN_DISPUTE':
-                break;
-            case 'REFUNDED':
-                break;
-            case 'CANCELLED':
-                break;
-        }
+        $status_type = $status->getTypeFromValue();
+        
+        $pp_response = array();
+        $pp_response['reason_text'] = __('order_id') . '-' . $status_type;
+        $pp_response['order_status'] = translate_pagseguro_status($status_type, $order_id);
+
+        fn_update_order_payment_info($order_id, $pp_response);
+        fn_change_order_status($order_id, $pp_response['order_status'], '', array());
     }
+}
+
+
+function translate_pagseguro_status($type, $order_id)
+{
+    // http://www.cs-cart.com/documentation/reference_guide/index.htmld?orders_order_statuses.htm
+    // B: Backordered       C: Complete         D: Declined         F: Failed
+    // I: Canceled          N: None             O: Open             P: Processed
+    $cur_status = fn_get_order_short_info($order_id)['status'];
+    $result = $cur_status;
+    switch($status_type)
+    {
+        case 'WAITING_PAYMENT':
+        case 'IN_ANALYSIS':
+            if(in_array($cur_status, array('N')))
+            {
+                $result = 'O';
+            }
+            break;
+        case 'PAID':
+        case 'AVAILABLE':
+            if(in_array($cur_status, array('O', 'N')))
+            {
+                $result = 'P';
+            }
+            break;
+        case 'REFUNDED':
+        case 'IN_DISPUTE':
+        case 'CANCELLED':
+            if(in_array($cur_status, array('O', 'N')))
+            {
+                $result = 'I';
+            }
+            break;
+    }
+    return $result;
 }

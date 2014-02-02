@@ -10,13 +10,12 @@ if (!defined('BOOTSTRAP')) { die('Access denied'); }
 
 if (defined('PAYMENT_NOTIFICATION'))
 {
-    // here comes the code for notifications
-    // params to be here: dispatch[payment_notification.foo]=bar&payment=PagSeguro&order_id=baz
+    // this will never happen :(
+    // see ../../../app/controllers/common/payment_notification.php
     
-    // Vars defined here
-    // $mode = 'foo' // whatever you set after payment_notification.
-    
-    PSH\payment_notification($mode);
+    // Otherwise we can create a post controller for payment_notification :)
+    // see ../controllers/common/payment_notification.post.php
+    // and http://docs.cs-cart.com/precontrollers-postcontrollers
 }
 else
 {
@@ -38,10 +37,7 @@ else
     
     // gera a url de pagamento
     $submit_url = PSH\get_payment_url($paymentRequest, $credentials);
-    
-    // salva o pedido na nossa base
-    PSH\save_order($order_id);
-    
+        
     // create a redirect (form that posts) data to PagSeguro payment
     PSH\retirect_to_payment($submit_url);
 }
