@@ -29,15 +29,8 @@ else
     // $order_info = Array
     // $mode = 'place_order'
     
-    // create credentials
-    $credentials = PSH\get_credentials();
-    
-    // create payment request
-    $paymentRequest = PSH\create_payment_request($order_info);
-    
-    // gera a url de pagamento
-    $submit_url = PSH\get_payment_url($paymentRequest, $credentials);
-        
-    // create a redirect (form that posts) data to PagSeguro payment
-    PSH\retirect_to_payment($submit_url);
+    $of_payment_request = PSH\create_payment_request($order_info);
+    $to_payment = PSH\get_url($of_payment_request);
+
+    PSH\redirect($to_payment);
 }

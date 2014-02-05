@@ -1,187 +1,327 @@
 <?php
+
 namespace Addons\PagSeguro\Helper;
-
-
-require_once(
-'PagSeguroLibrary/PagSeguroLibrary.php');
-'PagSeguroLibrary/PagSeguroLibrary.php';
-
-
 use Tygh\Registry;
 
+require_once('PagSeguroLibrary/PagSeguroLibrary.php');
 
-function logger($msg, $f, $l)
-{
-    // Johny Logger, keep logging
-    $logger = Tygh\Logger::instance();
-    $logger->logfile = 'var/cache/pagseguro_payment' . date('Y-m-d') . '.log';
-    $logger->write($msg, $f, $l);
+
+// addon constants
+class PAYMENT {
+    const NAME = 'UOL PagSeguro Payment';
+    const SCRIPT = '../addons/pagseguro_payment/payments/script.php';
+    const LOG_PATH = 'var/cache/pagseguro_payment';
+    const CFG_PREFIX = 'addons.pagseguro_payment.';
+    const REDIR_URL = 'pagseguro.complete?';
+    const NOFITY_URL = 'payment_notification.pagseguro?payment=pagseguro&';
 }
 
 
-function get_credentials()
-{
-    $email = Registry::get('addons.pagseguro_payment.account_id');
-    $token = Registry::get('addons.pagseguro_payment.account_token');
+/**
+ * Registra em PAYMENT::LOG_PATH a mensagem de log
+ * @param string $msg
+ * @param string $file_name
+ * @param string $file_line
+ */
+function log($msg, $file_name = __FILE__, $file_line = __LINE__) {
+    // Johny Logger, keep logging
+    $logger = Tygh\Logger::instance();
+    $logger->logfile = PAYMENT::LOG_PATH . date('Y-m-d') . '.log';
+    $logger->write($msg, $file_name, $file_line);
+}
+
+
+/**
+ * Retorna as credênciais do pagseguro
+ * 
+ * @return PagSeguroAccountCredentials
+ */
+function get_credentials() {
+    $email = Registry::get(PAYMENT::CFG_PREFIX . 'account_id');
+    $token = Registry::get(PAYMENT::CFG_PREFIX . 'account_token');
+
     return new \PagSeguroAccountCredentials($email,$token);
 }
 
 
-function create_payment_request($order_info)
-{
-    $paymentRequest = new \PagSeguroPaymentRequest();
+/**
+ * Cria uma requisição de pagamento para o pagseguro
+ *
+ * @param array $order_info
+ * @return PagSeguroPaymentRequest
+ */
+function create_payment_request($order_info) {
+    $in_payment_request = new \PagSeguroPaymentRequest();
 
-    set_order_info($paymentRequest, $order_info);
-    set_sender($paymentRequest, $order_info);
-    set_shipping($paymentRequest, $order_info);
-    add_items($paymentRequest, $order_info['products']);
-    return $paymentRequest;
+    set_order_info($in_payment_request, $order_info);
+    set_sender($in_payment_request, $order_info);
+    set_shipping($in_payment_request, $order_info);
+    add_items($in_payment_request, $order_info['products']);
+
+    return $in_payment_request;
 }
 
 
-function set_order_info($paymentRequest, $order_info)
-{
-    $id = $order_info['order_id'];
-    $paymentRequest->addParameter('redirectURL', \fn_url("pagseguro.complete?order_id=$id"));
-    $paymentRequest->addParameter('notificationURL', \fn_url("payment_notification.pagseguro?payment=pagseguro&order_id=$id"));
-    $paymentRequest->setReference($id);
-    $paymentRequest->setCurrency(\PagSeguroCurrencies::getIsoCodeByName('REAL'));
-    return $paymentRequest;
+/**
+ * Define na requisição de pagamento
+ * os detalhes mínimos do pedido
+ *
+ * @param PagSeguroPaymentRequest $payment_request
+ * @param array $order_info
+ * @return PagSeguroPaymentRequest
+ */
+function set_order_info($payment_request, $order_info) {
+    $order = $order_info['order_id'];
+
+    //$payment_request->addParameter('redirectURL',        \fn_url(PAYMENT::REDIR_URL .     "order_id=$order"));
+    //$payment_request->addParameter('notificationURL',    \fn_url(PAYMENT::NOFITY_URL .    "order_id=$order"));
+    $payment_request->addParameter('redirectURL',        "http://php-barzilay.rhcloud.com/index.php?dispatch=pagseguro.complete&order_id=$order");
+    $payment_request->addParameter('notificationURL',    "http://php-barzilay.rhcloud.com/index.php?dispatch=pagseguro.complete&order_id=$order");
+    $payment_request->setCurrency(\PagSeguroCurrencies::getIsoCodeByName('REAL'));
+    $payment_request->setReference($order);
+
+    return $payment_request;
 }
 
 
-function add_items($paymentRequest, $itens)
-{
-    foreach($itens as $product)
-    {
-        $paymentRequest->addItem(
+/**
+ * Adiciona na requisição de pagamento os itens
+ * do pedido
+ *
+ * @param PagSeguroPaymentRequest $payment_request
+ * @param array $itens do pedido
+ * @return PagSeguroPaymentRequest
+ */
+function add_items($payment_request, $itens) {
+    foreach($itens as $product) {
+        $payment_request->addItem(
             $product['product_id'],
             $product['product'],
             $product['amount'],
             $product['price']
         );
     }
-    return $paymentRequest;
+
+    return $payment_request;
 }
 
 
-function set_sender($paymentRequest, $sender_info)
-{
-    $paymentRequest->setSender(
-        $sender_info['firstname'] . ' ' . $sender_info['lastname'],
-        $sender_info['email']
+/**
+ * Define na requisição de pagamento os dados
+ * da pessoa que esta enviando o pedido
+ *
+ * @param PagSeguroPaymentRequest $payment_request
+ * @param array $sender
+ * @return PagSeguroPaymentRequest
+ */
+function set_sender($payment_request, $sender) {
+    $payment_request->setSender(
+        $sender['firstname'] . ' ' . $sender['lastname'],
+        $sender['email']
     );
-    return $paymentRequest;
+
+    return $payment_request;
 }
 
 
-function set_shipping_type($paymentRequest, $shipping_info)
-{
-    $typeName = strtoupper($shipping_info['shipping']);
-    $type = \PagSeguroShippingType::getCodeByType($typeName);
-    $type = $type === false ? \PagSeguroShippingType::getCodeByType('NOT_SPECIFIED') : $type;
-    $paymentRequest->setShippingType($type);
-    return $paymentRequest;
+/**
+ * Define na requisição de pagamento
+ * o tipo de envio
+ *
+ * @param PagSeguroPaymentRequest $payment_request
+ * @param array $shipping
+ * @return PagSeguroPaymentRequest
+ */
+function set_shipping_type($payment_request, $shipping) {
+    $name = \strtoupper($shipping['shipping']);
+    $type = \PagSeguroShippingType::getCodeByType($name);
+    $type = $type ?  $type : \PagSeguroShippingType::getCodeByType('NOT_SPECIFIED');
+    $payment_request->setShippingType($type);
+
+    return $payment_request;
 }
 
 
-function set_shipping($paymentRequest, $shipping_info)
-{
-    set_shipping_type($paymentRequest, $shipping_info['shipping'][0]);
-    $paymentRequest->setShippingCost($shipping_info['shipping_cost']);
-    $paymentRequest->setShippingAddress(
-        $shipping_info['s_zipcode'],
-        $shipping_info['s_address'],
+/**
+ * Define na requisição de pagamento
+ * as informações de entrega
+ * @param PagSeguroPaymentRequest $payment_request
+ * @param array $shipping
+ * @return PagSeguroPaymentRequest
+ */
+function set_shipping($payment_request, $shipping) {
+    set_shipping_type($payment_request, $shipping['shipping'][0]);
+    $payment_request->setShippingCost($shipping['shipping_cost']);
+    $payment_request->setShippingAddress(
+        $shipping['s_zipcode'],
+        $shipping['s_address'],
         null,
-        $shipping_info['s_address_2'],
+        $shipping['s_address_2'],
         null,
-        $shipping_info['s_city'],
-        $shipping_info['s_state'],
-        $shipping_info['s_country']
+        $shipping['s_city'],
+        $shipping['s_state'],
+        $shipping['s_country']
     );
-    return $paymentRequest;
+
+    return $payment_request;
 }
 
 
-function get_payment_url($paymentRequest, $credentials)
-{
-    return $paymentRequest->register($credentials);
+/**
+ * Registra o pedido no pagseguro e retorna a url para
+ * pagamento deste pedido
+ * @param Object $payment_request
+ * @return string url
+ */
+function get_url($paymentRequest) {
+    return $paymentRequest->register(get_credentials());
 }
 
 
-function retirect_to_payment($submit_url)
-{
+/**
+ * Redireciona o usuário para a página de pagamento
+ *
+ * @param string $to_payment url
+ */
+function redirect($to_payment) {
     // aditional data for cs-cart
     $data = array();
-    $payment_name = 'UOL PagSeguro Payment';
+    $payment_name = PAYMENT::NAME;
     $exclude_empty_values = true;
     
-    // create a redirect (form that posts) data to PagSeguro payment
-    fn_create_payment_form($submit_url, $data, $payment_name, $exclude_empty_values);
+    \fn_create_payment_form($to_payment, $data, $payment_name, $exclude_empty_values);
 }
 
 
-function payment_notification($code)
-{
-    if ($_REQUEST['notificationType'] === 'transaction') {
-        $transaction = \PagSeguroNotificationService::checkTransaction(  
-            get_credentials(),
-            $_REQUEST['notificationCode']
-        );
-        
-        $order_id = $transaction->getReference();
-        $status = $transaction->getStatus();
-        $status_type = $status->getTypeFromValue();
-        list($from, $to) = translate_pagseguro_status($status_type, $order_id);
-        
-        $pp_response = array();
-        $pp_response['reason_text'] = __('order_id') . '-' . $status_type;
-        $pp_response['order_status'] = $to;
+/**
+ * Recebe a notificação do pagseguro
+ *
+ * @param string $notification do pagseguro
+ */
+function receive($notification) {
+    $transaction = \PagSeguroNotificationService::checkTransaction(  
+        get_credentials(),
+        $notification
+    );
+    $order = $transaction->getReference();
+    $with_status = $transaction->getStatus()->getTypeFromValue();
+    
+    update($order, $with_status);
+}
 
-        if($from == 'N')
-        {
-           fn_finish_payment($order_id, $pp_response); 
-        } else
-        {
-           fn_update_order_payment_info($order_id, $pp_response);
-           fn_change_order_status($order_id, $pp_response['order_status'], $from, array());
+
+/**
+ * Confirma um pedido
+ * 
+ * @param int $order id
+ */
+function confirm($order) {
+    $started_payment_with_pagseguro =\fn_check_payment_script(PAYMENT::SCRIPT, $order);
+    if ($started_payment_with_pagseguro) {
+        update($order, PAGSEGURO_STATUS::WAITING_PAYMENT);
+        \fn_order_placement_routines('save', $order);
+    }
+}
+
+
+/**
+ * Atualiza o pedido com o status retornado pelo pagseguro
+ *
+ * @param int $order id
+ * @param string $pagseguro_status
+ */
+function update($order, $pagseguro_status) {
+    $current = status_of($order);
+    $status = convert($pagseguro_status, $current);
+    if ($status != $current) {
+        $response = array();
+        $response['order_status'] = $status;
+        $response['reason_text'] = __('order_id') . '-' . $pagseguro_status;
+        if ($from == ORDER_STATUS::NONE) {
+           \fn_finish_payment($order, $response); 
+        } else {
+           \fn_update_order_payment_info($order, $response);
+           \fn_change_order_status($order, $status, $current, array());
         }
     }
 }
 
 
-function translate_pagseguro_status($type, $order_id)
-{
-    // http://www.cs-cart.com/documentation/reference_guide/index.htmld?orders_order_statuses.htm
-    // B: Backordered       C: Complete         D: Declined         F: Failed
-    // I: Canceled          N: None             O: Open             P: Processed
-    $order_short_info = fn_get_order_short_info($order_id);
-    $cur_status = $order_short_info['status'];
-    $result = $cur_status;
-    switch($status_type)
-    {
-        case 'WAITING_PAYMENT':
-        case 'IN_ANALYSIS':
-            if(in_array($cur_status, array('N')))
-            {
-                $result = 'O';
-            }
-            break;
-        case 'PAID':
-        case 'AVAILABLE':
-            if(in_array($cur_status, array('O', 'N')))
-            {
-                $result = 'P';
-            }
-            break;
-        case 'REFUNDED':
-        case 'IN_DISPUTE':
-        case 'CANCELLED':
-            if(in_array($cur_status, array('O', 'N')))
-            {
-                $result = 'I';
-            }
-            break;
+/**
+ * Converte o status do pagseguro no status do cs-cart
+ * @param string $pagseguro_status
+ * @param string $current status
+ * @return string cs-cart status
+ */
+function convert($pagseguro_status, $current) {
+    $result = $current;
+
+    switch($pagseguro_status) {
+    case PAGSEGURO_STATUS::WAITING_PAYMENT:
+    case PAGSEGURO_STATUS::IN_ANALYSIS:
+        if (
+           $current == ORDER_STATUS::NONE
+        ) {
+            $result = ORDER_STATUS::OPEN;
+        }
+        break;
+
+    case PAGSEGURO_STATUS::PAID:
+    case PAGSEGURO_STATUS::AVAILABLE:
+        if (
+            $current == ORDER_STATUS::OPEN
+            || $current == ORDER_STATUS::NONE
+        ) {
+            $result = ORDER_STATUS::COMPLETE;
+        }
+        break;
+
+    case PAGSEGURO_STATUS::REFUNDED:
+    case PAGSEGURO_STATUS::IN_DISPUTE:
+    case PAGSEGURO_STATUS::CANCELLED:
+        if (
+            $current == ORDER_STATUS::OPEN
+            || $current == ORDER_STATUS::NONE
+        ) {
+            $result = ORDER_STATUS::CANCELED;
+        }
+        break;
     }
-    return array($cur_status, $result);
+
+    return $result;
+}
+
+
+/**
+ * Retorna o status de um pedido
+ * @param int $order id
+ * @return string order status
+*/
+function status_of($order) {
+    $order_short_info = \fn_get_order_short_info($order);
+    return $order_short_info['status'];
+}
+
+
+class PAGSEGURO_STATUS {
+    const WAITING_PAYMENT = 'WAITING_PAYMENT';
+    const IN_ANALYSIS = 'IN_ANALYSIS';
+    const PAID = 'PAID';
+    const AVAILABLE = 'AVAILABLE';
+    const REFUNDED = 'REFUNDED';
+    const IN_DISPUTE = 'IN_DISPUTE';
+    const CANCELLED = 'CANCELLED';
+}
+
+
+// http://www.cs-cart.com/documentation/reference_guide/index.htmld?orders_order_statuses.htm   
+class ORDER_STATUS {
+    const BACKORDERED = 'B';
+    const COMPLETE = 'C';
+    const DECLINED = 'D';
+    const FAILED = 'F';
+    const CANCELED = 'I';
+    const NONE = 'N';
+    const OPEN = 'O';
+    const PROCESSED = 'P';
 }
