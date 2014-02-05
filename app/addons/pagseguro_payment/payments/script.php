@@ -2,7 +2,7 @@
 
 require_once('helper.php');
 
-use Addons\PagSeguro\Helper as PSH;
+use Addons\PagSeguro\Helper as Please; // we will be polite
 
 
 // test if cs-cart was installed
@@ -29,8 +29,8 @@ else
     // $order_info = Array
     // $mode = 'place_order'
     
-    $of_payment_request = PSH\create_payment_request($order_info);
-    $to_payment = PSH\get_url($of_payment_request);
+    $of_payment_request = Please\create_payment_request($order_info);
+    $to_payment = Please\get_url($of_payment_request);
 
-    PSH\redirect($to_payment);
+    Please\redirect_user($to_payment);
 }

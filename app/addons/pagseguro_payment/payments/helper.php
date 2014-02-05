@@ -3,6 +3,7 @@
 namespace Addons\PagSeguro\Helper;
 use Tygh\Registry;
 
+
 require_once('PagSeguroLibrary/PagSeguroLibrary.php');
 
 
@@ -75,8 +76,8 @@ function set_order_info($payment_request, $order_info) {
 
     //$payment_request->addParameter('redirectURL',        \fn_url(PAYMENT::REDIR_URL .     "order_id=$order"));
     //$payment_request->addParameter('notificationURL',    \fn_url(PAYMENT::NOFITY_URL .    "order_id=$order"));
-    $payment_request->addParameter('redirectURL',        "http://php-barzilay.rhcloud.com/index.php?dispatch=pagseguro.complete&order_id=$order");
-    $payment_request->addParameter('notificationURL',    "http://php-barzilay.rhcloud.com/index.php?dispatch=pagseguro.complete&order_id=$order");
+    $payment_request->addParameter('redirectURL',        "http://54.201.120.65/index.php?dispatch=pagseguro.complete&order_id=$order");
+    $payment_request->addParameter('notificationURL',    "http://54.201.120.65/index.php?dispatch=payment_notification.pagseguro&payment=pagseguro&order_id=$order");
     $payment_request->setCurrency(\PagSeguroCurrencies::getIsoCodeByName('REAL'));
     $payment_request->setReference($order);
 
@@ -183,7 +184,7 @@ function get_url($paymentRequest) {
  *
  * @param string $to_payment url
  */
-function redirect($to_payment) {
+function redirect_user($to_payment) {
     // aditional data for cs-cart
     $data = array();
     $payment_name = PAYMENT::NAME;
@@ -199,27 +200,29 @@ function redirect($to_payment) {
  * @param string $notification do pagseguro
  */
 function receive($notification) {
-    $transaction = \PagSeguroNotificationService::checkTransaction(  
+    $of_transaction = \PagSeguroNotificationService::checkTransaction(  
         get_credentials(),
         $notification
     );
-    $order = $transaction->getReference();
-    $with_status = $transaction->getStatus()->getTypeFromValue();
-    
-    update($order, $with_status);
+    update_the_order($of_transaction);
 }
 
 
 /**
- * Confirma um pedido
+ * Confirma um pedido com uma trasação
  * 
  * @param int $order id
+ * @param string $with_transaction code do pagseguro
  */
-function confirm($order) {
+function confirm($order, $with_this_transaction) {
     $started_payment_with_pagseguro =\fn_check_payment_script(PAYMENT::SCRIPT, $order);
     if ($started_payment_with_pagseguro) {
-        update($order, PAGSEGURO_STATUS::WAITING_PAYMENT);
-        \fn_order_placement_routines('save', $order);
+        $of_transaction = \PagSeguroTransactionSearchService::searchByCode(
+            get_credentials(),
+            $with_this_transaction
+        );
+        $act = update_the_order($of_transaction);
+        \fn_order_placement_routines($act, $order);
     }
 }
 
@@ -227,23 +230,25 @@ function confirm($order) {
 /**
  * Atualiza o pedido com o status retornado pelo pagseguro
  *
- * @param int $order id
- * @param string $pagseguro_status
+ * @param PagSeguroTransaction $of_transaction
  */
-function update($order, $pagseguro_status) {
-    $current = status_of($order);
-    $status = convert($pagseguro_status, $current);
-    if ($status != $current) {
+function update_the_order($of_transaction) {
+    $of_order = $of_transaction->getReference();
+    $with_current = status($of_order);
+    $pagseguro_status = $of_transaction->getStatus()->getTypeFromValue();
+    $to_status = convert($pagseguro_status, $with_current);
+    if ($to_status != $with_current) {
         $response = array();
-        $response['order_status'] = $status;
-        $response['reason_text'] = __('order_id') . '-' . $pagseguro_status;
+        $response['order_status']   = $to_status;
+        $response['reason_text']    = __('order_id') . '-' . $pagseguro_status;
         if ($from == ORDER_STATUS::NONE) {
-           \fn_finish_payment($order, $response); 
+           \fn_finish_payment($of_order, $response); 
         } else {
-           \fn_update_order_payment_info($order, $response);
-           \fn_change_order_status($order, $status, $current, array());
+           \fn_update_order_payment_info($of_order, $response);
+           \fn_change_order_status($of_order, $to_status, $with_current, array());
         }
     }
+    return $to_status == ORDER_STATUS::NONE ? 'route' : 'save';
 }
 
 
@@ -281,7 +286,6 @@ function convert($pagseguro_status, $current) {
     case PAGSEGURO_STATUS::CANCELLED:
         if (
             $current == ORDER_STATUS::OPEN
-            || $current == ORDER_STATUS::NONE
         ) {
             $result = ORDER_STATUS::CANCELED;
         }
@@ -297,8 +301,8 @@ function convert($pagseguro_status, $current) {
  * @param int $order id
  * @return string order status
 */
-function status_of($order) {
-    $order_short_info = \fn_get_order_short_info($order);
+function status($of_order) {
+    $order_short_info = \fn_get_order_short_info($of_order);
     return $order_short_info['status'];
 }
 
@@ -316,12 +320,13 @@ class PAGSEGURO_STATUS {
 
 // http://www.cs-cart.com/documentation/reference_guide/index.htmld?orders_order_statuses.htm   
 class ORDER_STATUS {
-    const BACKORDERED = 'B';
+    const BACKORDERED = \STATUS_BACKORDERED_ORDER;
     const COMPLETE = 'C';
     const DECLINED = 'D';
     const FAILED = 'F';
-    const CANCELED = 'I';
-    const NONE = 'N';
-    const OPEN = 'O';
+    const CANCELED = \STATUS_CANCELED_ORDER;
+    const NONE = \STATUS_INCOMPLETED_ORDER;
+    const OPEN = \STATUSES_ORDER;
     const PROCESSED = 'P';
+    const DARTH_VADER = \STATUS_PARENT_ORDER; // Luke, I'm your father...
 }
