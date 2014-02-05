@@ -76,8 +76,6 @@ function set_order_info($payment_request, $order_info) {
 
     $payment_request->addParameter('redirectURL',        \fn_url(PAYMENT::REDIR_URL .     "order_id=$order"));
     $payment_request->addParameter('notificationURL',    \fn_url(PAYMENT::NOFITY_URL .    "order_id=$order"));
-    //$payment_request->addParameter('redirectURL',        "http://54.201.120.65/index.php?dispatch=pagseguro.complete&order_id=$order");
-    //$payment_request->addParameter('notificationURL',    "http://54.201.120.65/index.php?dispatch=payment_notification.pagseguro&payment=pagseguro&order_id=$order");
     $payment_request->setCurrency(\PagSeguroCurrencies::getIsoCodeByName('REAL'));
     $payment_request->setReference($order);
 
